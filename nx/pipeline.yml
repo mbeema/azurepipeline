@@ -89,6 +89,19 @@ jobs:
       artifactName: 'webApp'
       downloadPath: $(System.DefaultWorkingDirectory)/artifacts
 
+  #- task: AzureCLI@2
+  #    inputs:
+  #      azureSubscription: 'Your-Azure-Subscription-Name' # replace this with your Azure subscription name
+  #      scriptType: 'bash'
+  #      scriptLocation: 'inlineScript'
+  #      inlineScript: |
+  #        az staticwebapp appsettings set --name $(AppName) \
+  #                                        --resource-group $(ResourceGroupName) \
+  #                                        --setting-names \
+  #                                        MY_ENV_VAR=$(MyEnvVar) \
+  #                                        ANOTHER_ENV_VAR=$(AnotherEnvVar)
+  #    displayName: 'Set Application Settings via Azure CLI'
+
   - task: AzureStaticWebApp@0
     inputs:
       app_location: '$(appName)'
