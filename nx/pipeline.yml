@@ -1,0 +1,99 @@
+trigger:
+  branches:
+    include:
+    - master
+    - staging
+    - develop
+
+pr:
+  branches:
+    include:
+    - develop
+    - staging
+    - master
+
+variables:
+  latestTag: $(git describe --tags --abbrev=0)
+
+jobs:
+- job: BuildAndTest
+  strategy:
+    matrix:
+      app1:
+        appName: 'app1'
+      app2:
+        appName: 'app2'
+  pool:
+    vmImage: 'ubuntu-latest'
+
+  #steps:
+  #- checkout: self
+  #  persistCredentials: true
+  steps:
+  - script: git fetch --tags
+    displayName: 'Fetch Tags'
+
+  - script: |
+      #cd $(appName)
+      export NODE_OPTIONS="--max-old-space-size=4096"
+      npm install --no-optional
+    displayName: 'Install Dependencies $(appName)'
+
+  - script: |
+      #latestTag=$(git describe --tags `git rev-list --tags --max-count=1`)
+      if [ -z "$latestTag" ]; then
+        nx lint $(appName)
+        nx test $(appName)
+      else
+        nx affected:lint --base=$latestTag --head=$(Build.SourceVersion)
+        nx affected:test --base=$latestTag --head=$(Build.SourceVersion)
+      fi
+    displayName: 'Lint & Test $(appName)'
+
+
+  - script: |
+      outputPath="./dist/apps/$(appName)"
+      #latestTag=$(git describe --tags `git rev-list --tags --max-count=1`)
+      if [ -z "$latestTag" ]; then
+        nx build $(appName) --outputPath=$outputPath --prod
+      else
+        nx affected:build --base=$latestTag --head=$(Build.SourceVersion) --outputPath=$outputPath
+      fi
+    displayName: 'Build $(appName)'
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+
+  # Check Build Output
+  - script: |
+      outputPath="./dist/apps/$(appName)"
+      if [ -d "$outputPath" ] && [ "$(ls -A $outputPath)" ]; then
+        echo "##vso[task.setvariable variable=hasGeneratedFiles;isOutput=true]true"
+      else
+        echo "##vso[task.setvariable variable=hasGeneratedFiles;isOutput=true]false"
+      fi
+    displayName: 'Check Build Output'
+    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+    name: check_build_output
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: 'dist/apps/$(appName)'
+      artifactName: 'webApp'
+    condition: and(succeeded(), eq(variables.hasGeneratedFiles, 'true'))
+
+- job: Release
+  dependsOn: BuildAndTest
+  condition: and(succeeded(), eq(variables.hasGeneratedFiles, 'true'))
+  steps:
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      artifactName: 'webApp'
+      downloadPath: $(System.DefaultWorkingDirectory)/artifacts
+
+  - script: |
+      # Deployment script here to deploy the artifacts
+    displayName: 'Deploy Artifacts'
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+
+  - script: git tag -a $(Build.BuildId) -m "Production release $(Build.BuildId)"
+    displayName: 'Tag Source Code'
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
