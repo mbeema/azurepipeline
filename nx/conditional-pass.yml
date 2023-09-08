@@ -1,0 +1,21 @@
+trigger:
+- master
+
+jobs:
+- job: job1
+  steps:
+  - powershell: |
+      $randomNumber = Get-Random -Minimum 1 -Maximum 3
+      echo "Random number is $randomNumber"
+      echo "##vso[task.setvariable variable=randomNumber;isOutput=true]$randomNumber"
+    name: setRandomNumberStep
+
+- job: job2
+  dependsOn: job1
+  variables:
+    randomNumberFromJob1: $[ dependencies.job1.outputs['setRandomNumberStep.randomNumber'] ]
+  steps:
+  - script: echo "This task always runs."
+  
+  - script: echo "This task only runs if random number from job1 is 2."
+    condition: eq(variables.randomNumberFromJob1, '2')
