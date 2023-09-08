@@ -89,6 +89,13 @@ jobs:
       artifactName: 'webApp'
       downloadPath: $(System.DefaultWorkingDirectory)/artifacts
 
+  - task: AzureStaticWebApp@0
+    inputs:
+      app_location: '$(appName)'
+      azure_static_web_apps_api_token: $(deployment_token)
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'), eq(variables['hasGeneratedFiles'], 'true'))
+    displayName: 'Deploy to Azure Static Web App'
+
   - script: |
       # Deployment script here to deploy the artifacts
     displayName: 'Deploy Artifacts'
